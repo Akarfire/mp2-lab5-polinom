@@ -25,6 +25,7 @@ class Polinom
 		{
 			A = InMonom.A;
 			Power = InMonom.Power;
+			pNext = nullptr;
 
 		}
 
@@ -32,6 +33,32 @@ class Polinom
 		{
 			return A * pow(InX, Power / 100) * pow(InY, (Power % 100) / 10) * pow(InZ, Power % 10);
 		}
+
+		bool operator==(const Monom& InMonom) { return (A == InMonom.A && Power == InMonom.Power); }
+		bool operator!=(const Monom& InMonom) { return (A != InMonom.A || Power != InMonom.Power); }
+
+		std::string ToString()
+		{
+			std::string OutString;
+
+			if (A >= 0)
+				OutString += "+ ";
+
+			if (A != 1)
+				OutString += std::to_string(float(A));
+
+			if (Power / 100 != 0)
+				OutString += 'x' + std::to_string(int(Power / 100));
+
+			if ((Power % 100) / 10 != 0)
+				OutString += 'y' + std::to_string(int((Power % 100) / 10));
+
+			if (Power % 10 != 0)
+				OutString += 'z' + std::to_string(int (Power % 10));
+
+			return OutString;
+		}
+	
 	};
 
 	Monom* pFirst;
@@ -83,7 +110,7 @@ public:
 	Polinom(Polinom&& InMovingPolinom) noexcept : pFirst(InMovingPolinom.pFirst) { InMovingPolinom.pFirst = nullptr; }
 
 	// Destructor
-	~Polinom() { DeletePolinom; }
+	~Polinom() { DeletePolinom(); }
 
 
 	// Calculates the value of the Polinom in (X, Y, Z)
@@ -110,4 +137,9 @@ public:
 	const Polinom& operator+=(const Polinom& InPolinom);
 	const Polinom& operator-=(const Polinom& InPolinom);
 	const Polinom& operator*=(double InConst);
+
+	// Comarison
+	bool operator==(const Polinom& InPolinom);
+
+	std::string ToString();
 };

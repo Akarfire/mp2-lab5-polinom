@@ -23,5 +23,8 @@
     <ClCompile Include="Polinom.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="PolinomCalculator.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

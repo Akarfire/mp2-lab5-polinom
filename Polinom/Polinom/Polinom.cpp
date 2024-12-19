@@ -3,18 +3,30 @@
 
 Polinom::Polinom(std::string InPolinomNotation)
 {
+	pFirst = nullptr;
+
 	// Funning Parsing
 	std::string CurrentLexeme;
+	float Multiplier = 1.f;
 
-	for (char c : InPolinomNotation)
+	for (int i = 0; i < InPolinomNotation.size(); i++)
 	{
-		if (std::string("+-").find(c) != std::string::npos)
-		{
-			// End of current lexeme (current monom)
-			if (size(CurrentLexeme) <= 0)
-				throw(std::runtime_error("Empty Monom Notation!"));
+		char c = InPolinomNotation[i];
+		if (c == ' ' && i != InPolinomNotation.size() - 1)
+			continue;
 
-			InsertMonom(CreateMonomFromNotation(CurrentLexeme));
+		if (std::string("+-").find(c) != std::string::npos || i == InPolinomNotation.size() - 1)
+		{
+			if (i == InPolinomNotation.size() - 1)
+				CurrentLexeme += c;
+
+			// End of current lexeme (current monom)
+
+			InsertMonom(CreateMonomFromNotation(CurrentLexeme += " "), Multiplier);
+
+			Multiplier = 1.f;
+			if (c == '-')
+				Multiplier = -1.f;
 
 			CurrentLexeme = "";
 		}
@@ -22,17 +34,16 @@ Polinom::Polinom(std::string InPolinomNotation)
 		else
 			CurrentLexeme += c;
 	}
-
-	if (size(CurrentLexeme) <= 0)
-		throw(std::runtime_error("Empty Monom Notation!"));
-
-	InsertMonom(CreateMonomFromNotation(CurrentLexeme));
+	InsertMonom(CreateMonomFromNotation("0"), 1.f);
 }
 
 Polinom::Polinom(const Polinom& InPolinom)
 {
 	Monom* OriginalMonom = InPolinom.pFirst;
 	Monom* Last = nullptr;
+
+	pFirst = nullptr;
+
 	while (OriginalMonom)
 	{
 		Monom* NewMonom = new Monom(*OriginalMonom);
@@ -53,18 +64,27 @@ bool Polinom::ReadMonomNotation(std::string InNotation, double& OutA, int& OutPo
 {
 	char LastVar = '-';
 	std::string CurrentLexeme;
-	for (char c : InNotation)
-	{
-		if (std::string("*^").find(c) != std::string::npos)
-			continue;
 
-		if (std::string("xyz").find(c) != std::string::npos)
+	OutPower = 0;
+
+	for (int i = 0; i < InNotation.size(); i++)
+	{
+		char c = InNotation[i];
+
+		bool IsVar = std::string("xyz").find(c) != std::string::npos;
+		if (IsVar || i == InNotation.size() - 1)
 		{
+
 			if (LastVar == '-')
 			{
 				try
 				{
-					OutA = std::stod(CurrentLexeme);
+					if (CurrentLexeme.size() > 0)
+						OutA = std::stod(CurrentLexeme);
+					else if (i != InNotation.size() - 1)
+						OutA = 1;
+					else
+						OutA = 0;
 				}
 				catch (std::invalid_argument exception) { return false; }
 			}
@@ -74,12 +94,9 @@ bool Polinom::ReadMonomNotation(std::string InNotation, double& OutA, int& OutPo
 
 				try
 				{
-					int Power = 0;
+					int Power = 1;
 
-					if (CurrentLexeme.size() == 0)
-						Power = 1;
-
-					else
+					if (CurrentLexeme.size() > 0)
 						Power = std::stoi(CurrentLexeme);
 
 					if (Power >= 10)
@@ -106,8 +123,15 @@ bool Polinom::ReadMonomNotation(std::string InNotation, double& OutA, int& OutPo
 				catch (std::invalid_argument exception) { return false; }
 			}
 
+			CurrentLexeme = "";
 			LastVar = c;
 		}
+
+		else if (std::string("*^ ").find(c) != std::string::npos)
+			continue;
+
+		else
+			CurrentLexeme += c;
 	}
 
 	return true;
@@ -118,14 +142,14 @@ void Polinom::InsertMonom(Monom* InMonom, double Multiplier)
 {
 	Monom* P = pFirst;
 	Monom* Prp = nullptr;
-	while (P && P->Power > InMonom->Power)
+	while (P != nullptr && P->Power > InMonom->Power)
 	{
 		Prp = P;
 		P = P->pNext;
 	}
 
-	if (Prp->Power == InMonom->Power)
-		Prp->A += InMonom->A * Multiplier;
+	if (P && P->Power == InMonom->Power)
+		P->A += InMonom->A * Multiplier;
 
 	else
 	{
@@ -158,6 +182,8 @@ void Polinom::DeletePolinom()
 
 		pFirst = Next;
 	}
+
+	pFirst = nullptr;
 }
 
 
@@ -177,29 +203,24 @@ double Polinom::Calculate(double InX, double InY, double InZ)
 
 Polinom Polinom::DerivativeX()
 {
-	Polinom Result(*this);
+	Polinom Result;
 
-	Monom* Prp = nullptr;
-	Monom* P = Result.pFirst;
+	Monom* P = pFirst;
 	while (P)
 	{
+		double A = 0;
+		int Power = 0;
+
 		if (P->Power / 100 > 0)
 		{
-			P->A *= P->Power / 100;
-			P->Power -= 100;
-
-			Prp = P;
-			P = P->pNext;
+			A = P->A * (P->Power / 100);
+			Power = P->Power - 100;
 		}
 
-		else
-		{
-			Prp->pNext = P->pNext;
+		Monom* NewMonom = new Monom(A, Power);
+		Result.InsertMonom(NewMonom);
 
-			delete P;
-
-			P = Prp->pNext;
-		}
+		P = P->pNext;
 	}
 
 	return Result;
@@ -207,29 +228,24 @@ Polinom Polinom::DerivativeX()
 
 Polinom Polinom::DerivativeY()
 {
-	Polinom Result(*this);
+	Polinom Result;
 
-	Monom* Prp = nullptr;
-	Monom* P = Result.pFirst;
+	Monom* P = pFirst;
 	while (P)
 	{
+		double A = 0;
+		int Power = 0;
+
 		if ((P->Power % 100) / 10 > 0)
 		{
-			P->A *= (P->Power % 100) / 10;
-			P->Power -= 10;
-
-			Prp = P;
-			P = P->pNext;
+			A = P->A * ((P->Power % 100) / 10);
+			Power = P->Power - 10;
 		}
 
-		else
-		{
-			Prp->pNext = P->pNext;
+		Monom* NewMonom = new Monom(A, Power);
+		Result.InsertMonom(NewMonom);
 
-			delete P;
-
-			P = Prp->pNext;
-		}
+		P = P->pNext;
 	}
 
 	return Result;
@@ -237,29 +253,24 @@ Polinom Polinom::DerivativeY()
 
 Polinom Polinom::DerivativeZ()
 {
-	Polinom Result(*this);
+	Polinom Result;
 
-	Monom* Prp = nullptr;
-	Monom* P = Result.pFirst;
+	Monom* P = pFirst;
 	while (P)
 	{
+		double A = 0;
+		int Power = 0;
+
 		if (P->Power % 10 > 0)
 		{
-			P->A *= P->Power % 10;
-			P->Power -= 1;
-
-			Prp = P;
-			P = P->pNext;
+			A = P->A * (P->Power % 10);
+			Power = P->Power - 1;
 		}
 
-		else
-		{
-			Prp->pNext = P->pNext;
+		Monom* NewMonom = new Monom(A, Power);
+		Result.InsertMonom(NewMonom);
 
-			delete P;
-
-			P = Prp->pNext;
-		}
+		P = P->pNext;
 	}
 
 	return Result;
@@ -285,6 +296,8 @@ const Polinom& Polinom::operator=(const Polinom& InPolinom)
 		Last = NewMonom;
 		OriginalMonom = OriginalMonom->pNext;
 	}
+
+	return *this;
 }
 
 
@@ -294,6 +307,8 @@ const Polinom& Polinom::operator=(Polinom&& InMovingPolinom)
 
 	pFirst = InMovingPolinom.pFirst;
 	InMovingPolinom.pFirst = nullptr;
+
+	return *this;
 }
 
 
@@ -325,8 +340,6 @@ Polinom Polinom::operator-(const Polinom& InPolinom) const
 		InP = InP->pNext;
 	}
 
-	Result *= (1 / Result.pFirst->A);
-
 	return Result;
 }
 
@@ -342,7 +355,6 @@ const Polinom& Polinom::operator+=(const Polinom& InPolinom)
 		InP = InP->pNext;
 	}
 
-	operator*=(1 / pFirst->A);
 
 	return *this;
 }
@@ -359,7 +371,6 @@ const Polinom& Polinom::operator-=(const Polinom& InPolinom)
 		InP = InP->pNext;
 	}
 
-	operator*=(1 / pFirst->A);
 
 	return *this;
 }
@@ -373,6 +384,44 @@ const Polinom& Polinom::operator*=(double InConst)
 		P->A *= InConst;
 		P = P->pNext;
 	}
+
+	return *this;
+}
+
+bool Polinom::operator==(const Polinom& InPolinom)
+{
+	Monom* P1 = pFirst;
+	Monom* P2 = InPolinom.pFirst;
+	while (P1)
+	{
+		if (!P2)
+			return false;
+
+		if (*P1 != *P2)
+			return false;
+
+		P1 = P1->pNext;
+		P2 = P2->pNext;
+	}
+
+	return true;
+}
+
+std::string Polinom::ToString()
+{
+	std::string OutString;
+
+	Monom* P = pFirst;
+
+	while (P)
+	{
+		OutString += P->ToString();
+		P = P->pNext;
+		if (P)
+			OutString += " ";
+	}
+
+	return OutString;
 }
 
 
